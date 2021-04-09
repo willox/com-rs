@@ -95,6 +95,7 @@ impl core::fmt::Display for GUID {
 extern "system" {
     pub fn SysAllocStringLen(data: *const c_void, len: u32) -> *mut c_void;
     pub fn SysFreeString(bstr: *mut c_void);
+    pub fn SysStringLen(bstr: *mut c_void) -> u32;
 }
 
 #[cfg(windows)]

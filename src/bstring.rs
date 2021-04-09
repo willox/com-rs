@@ -17,9 +17,10 @@ impl BString {
     }
 
     fn len(&self) -> usize {
-        // The length of a BSTR is stored 4 bytes before its data
-        let ptr = self.0 as *const u32;
-        let len = unsafe { *ptr.offset(-1) };
+        let len = unsafe {
+            sys::SysStringLen(self.0 as _)
+        };
+
         usize::try_from(len).unwrap()
     }
 }

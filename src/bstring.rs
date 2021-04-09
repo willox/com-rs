@@ -69,3 +69,16 @@ impl TryFrom<BString> for String {
         Self::from_utf16(bstr.as_ref())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_nulls() {
+        let basic_string = BString::from("Hello\0World!");
+        let rust_string = String::try_from(basic_string).unwrap();
+        assert_eq!(rust_string, "Hello\0World!");
+    }
+
+}

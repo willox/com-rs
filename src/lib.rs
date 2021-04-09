@@ -49,6 +49,7 @@
 #![deny(missing_docs)]
 
 mod abi_transferable;
+mod bstring;
 mod interface;
 pub mod interfaces;
 mod param;
@@ -62,6 +63,8 @@ pub mod production;
 
 #[doc(inline)]
 pub use abi_transferable::AbiTransferable;
+#[doc(inline)]
+pub use bstring::BString;
 #[doc(inline)]
 pub use interface::Interface;
 #[doc(inline)]

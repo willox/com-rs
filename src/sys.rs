@@ -90,6 +90,14 @@ impl core::fmt::Display for GUID {
 }
 
 #[cfg(windows)]
+#[link(name = "oleaut32")]
+#[allow(missing_docs)]
+extern "system" {
+    pub fn SysAllocStringLen(data: *const c_void, len: u32) -> *mut c_void;
+    pub fn SysFreeString(bstr: *mut c_void);
+}
+
+#[cfg(windows)]
 #[link(name = "ole32")]
 #[allow(missing_docs)]
 extern "system" {

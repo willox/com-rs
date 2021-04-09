@@ -24,6 +24,8 @@
 //! #         unsafe fn Eat(&self) -> com::sys::HRESULT;
 //! #     }
 //! # }
+//!
+//! #[cfg(feature = "production")]
 //! com::class! {
 //!     pub class BritishShortHairCat: IAnimal {
 //!         num_owners: u32,

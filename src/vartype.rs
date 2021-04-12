@@ -2,12 +2,12 @@
 
 /// VARIANT type (VT_*)
 /// Not all possible types are specified
-#[derive(PartialEq, Eq, Clone, Copy)]
-#[repr(C)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[repr(u16)]
 pub enum TypeDescVarType {
     /// Nothing!
     Empty = 0,
-    
+
     /// 2-byte signed integer
     /// Contexts: Variants, SafeArrays, TypeDescs
     I2 = 2,

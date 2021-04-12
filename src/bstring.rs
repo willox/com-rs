@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use crate::{AbiTransferable, sys};
+use crate::{AbiTransferable, TypeDescVarType, sys};
 
 /// A COM BSTR https://docs.microsoft.com/en-us/previous-versions/windows/desktop/automat/bstr
 #[repr(C)]
@@ -35,6 +35,7 @@ impl Drop for BString {
 
 unsafe impl AbiTransferable for BString {
     type Abi = *mut u16;
+    const VAR_TYPE: TypeDescVarType = TypeDescVarType::BStr;
     fn get_abi(&self) -> Self::Abi {
         // TODO
         let copy = self.clone();

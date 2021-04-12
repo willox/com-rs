@@ -6,7 +6,7 @@ mod interfaces;
 mod vptr;
 pub mod vtable;
 
-pub use interface::{Interface, InterfaceMethod};
+pub use interface::{Interface, InterfaceMethod, InterfaceMethodKind};
 pub use interfaces::Interfaces;
 use proc_macro2::{Ident, TokenStream};
 use syn::Path;

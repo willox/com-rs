@@ -1,3 +1,5 @@
+use crate::TypeDescVarType;
+
 /// Types that are safe to transfer over a COM API boundary.
 ///
 /// # Safety
@@ -9,6 +11,8 @@
 pub unsafe trait AbiTransferable: Sized {
     /// The FFI compatible type the implementing type can turn into.
     type Abi;
+
+    const VAR_TYPE: TypeDescVarType;
 
     /// Turn the type into the FFI ABI type.
     fn get_abi(&self) -> Self::Abi;
@@ -52,9 +56,10 @@ pub unsafe trait AbiTransferable: Sized {
 }
 
 macro_rules! primitive_transferable_type {
-    ($($t:ty),+) => {
+    ($($t:ty = $vt:expr),+) => {
         $(unsafe impl AbiTransferable for $t {
             type Abi = Self;
+            const VAR_TYPE: TypeDescVarType = $vt;
             fn get_abi(&self) -> Self::Abi {
                 *self
             }
@@ -66,23 +71,23 @@ macro_rules! primitive_transferable_type {
 }
 
 primitive_transferable_type! {
-    bool,
-    i8,
-    u8,
-    i16,
-    u16,
-    i32,
-    u32,
-    i64,
-    u64,
-    f32,
-    f64,
-    usize,
-    crate::sys::GUID
+    bool = TypeDescVarType::Bool,
+    i8 = TypeDescVarType::I1,
+    u8 = TypeDescVarType::Ui1,
+    i16 = TypeDescVarType::I2,
+    u16 = TypeDescVarType::Ui2,
+    i32 = TypeDescVarType::I4,
+    u32 = TypeDescVarType::Ui4,
+    i64 = TypeDescVarType::I4,
+    u64 = TypeDescVarType::Ui4,
+    f32 = TypeDescVarType::R4,
+    f64 = TypeDescVarType::R8,
+    crate::sys::GUID = TypeDescVarType::Empty
 }
 
 unsafe impl<T> AbiTransferable for *mut T {
     type Abi = Self;
+    const VAR_TYPE: TypeDescVarType = TypeDescVarType::Empty;
     fn get_abi(&self) -> Self::Abi {
         *self
     }
@@ -93,6 +98,7 @@ unsafe impl<T> AbiTransferable for *mut T {
 
 unsafe impl<T> AbiTransferable for *const T {
     type Abi = Self;
+    const VAR_TYPE: TypeDescVarType = TypeDescVarType::Empty;
     fn get_abi(&self) -> Self::Abi {
         *self
     }
@@ -103,6 +109,7 @@ unsafe impl<T> AbiTransferable for *const T {
 
 unsafe impl<T: crate::Interface> AbiTransferable for T {
     type Abi = core::ptr::NonNull<core::ptr::NonNull<<T as crate::Interface>::VTable>>;
+    const VAR_TYPE: TypeDescVarType = TypeDescVarType::Unknown;
     fn get_abi(&self) -> Self::Abi {
         self.as_raw()
     }
@@ -114,6 +121,7 @@ unsafe impl<T: crate::Interface> AbiTransferable for T {
 
 unsafe impl<T: crate::Interface> AbiTransferable for Option<T> {
     type Abi = *mut core::ptr::NonNull<<T as crate::Interface>::VTable>;
+    const VAR_TYPE: TypeDescVarType = TypeDescVarType::Unknown;
     fn get_abi(&self) -> Self::Abi {
         self.as_ref()
             .map(|p| p.as_raw().as_ptr())

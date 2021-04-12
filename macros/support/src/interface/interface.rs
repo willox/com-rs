@@ -206,12 +206,36 @@ impl syn::parse::Parse for ParenthsizedStr {
     }
 }
 
+struct ParenthsizedInt {
+    lit: syn::LitInt,
+}
+
+impl syn::parse::Parse for ParenthsizedInt {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let lit;
+        syn::parenthesized!(lit in input);
+        let lit = lit
+            .parse()
+            .map_err(|e| syn::Error::new(e.span(), "IDs must be int literals".to_string()))?;
+
+        Ok(Self { lit })
+    }
+}
+
 pub struct InterfaceMethod {
     pub name: Ident,
     pub visibility: Visibility,
     pub args: Vec<InterfaceMethodArg>,
     pub ret: syn::ReturnType,
     pub docs: Vec<syn::Attribute>,
+    pub dispatch_id: Option<i32>,
+    pub kind: InterfaceMethodKind,
+}
+
+pub enum InterfaceMethodKind {
+    Method,
+    PropertyGet,
+    PropertySet,
 }
 
 pub struct InterfaceMethodArg {
@@ -244,10 +268,31 @@ macro_rules! expected_token {
 
 impl syn::parse::Parse for InterfaceMethod {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let docs = input.call(Attribute::parse_outer)?;
+        let mut dispatch_id = None;
+        let mut kind = InterfaceMethodKind::Method;
+        let attributes = input.call(Attribute::parse_outer)?;
+        let mut docs = Vec::new();
+        for attr in attributes.into_iter() {
+            let path = &attr.path;
+            let tokens = &attr.tokens;
+            if path.is_ident("doc") {
+                docs.push(attr);
+            } else if path.is_ident("id") {
+                let id: ParenthsizedInt = syn::parse2(tokens.clone())?;
+                dispatch_id = Some(id.lit.base10_parse::<i32>()?);
+            } else if path.is_ident("set") {
+                kind = InterfaceMethodKind::PropertySet;
+            } else if path.is_ident("get") {
+                kind = InterfaceMethodKind::PropertyGet;
+            } else {
+                return Err(syn::Error::new(
+                    path.span(),
+                    format!("Unrecognized attribute '{}'", path.to_token_stream()),
+                ));
+            }
+        }
         let visibility = input.parse::<syn::Visibility>()?;
         let method = input.parse::<syn::TraitItemMethod>()?;
-        unexpected_token!(docs.iter().find(|a| !a.path.is_ident("doc")), "attribute");
         unexpected_token!(method.default, "default method implementation");
         let sig = method.sig;
         unexpected_token!(sig.abi, "abi declaration");
@@ -290,6 +335,8 @@ impl syn::parse::Parse for InterfaceMethod {
             args,
             ret,
             docs,
+            dispatch_id,
+            kind,
         })
     }
 }

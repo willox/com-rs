@@ -6,12 +6,12 @@ use crate::vartype::TypeDescVarType;
 
 /// COM DISPID
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct DispatchId(pub i32);
 
 /// COM CALLCONV
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CallingConvention {
     /// The only calling convention I care about
     StdCall = 4,
@@ -19,7 +19,7 @@ pub enum CallingConvention {
 
 /// oleauto.h tagPARAMDATA
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParamData {
     /// name of this parameter
     pub name: *const u16,
@@ -32,7 +32,7 @@ unsafe impl Sync for ParamData {}
 
 /// oleauto.h tagMETHODDATA
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MethodData {
     /// name of this method
     pub name: *const u16,

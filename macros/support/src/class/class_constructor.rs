@@ -21,9 +21,17 @@ pub fn generate(class: &Class) -> TokenStream {
 
         Some(quote! {
             unsafe {
+                let method_data = <#interface as ::com::Interface>::method_data();
+                let method_count = method_data.len();
+                let interface_data = Box::new(::com::interfaces::idispatch::InterfaceData {
+                    methods: Vec::leak(method_data).as_ptr() as _,
+                    method_count: method_count as u32,
+                });
+                let interface_data = Box::leak(interface_data);
+
                 let mut type_info: Option<::com::interfaces::ITypeInfo> = None;
                 let res = ::com::sys::CreateDispTypeInfo(
-                    interface_data_ptr as *const _,
+                    interface_data as *const _ as _,
                     0,
                     &mut type_info as *mut _ as _,
                 );
@@ -55,14 +63,6 @@ pub fn generate(class: &Class) -> TokenStream {
     });
 
     let interface_inits = gen_vpointer_inits(class);
-
-    let interface_data = if class.requires_dispatch {
-        let chain = class.interfaces.iter().find(|x| x.needs_dispatch_imp).unwrap();
-        Some(chain.to_interface_data_ptr_tokens())
-    } else {
-        None
-    };
-
     let ref_count_ident = crate::utils::ref_count_ident();
 
     let interfaces = &class.interfaces;
@@ -76,7 +76,6 @@ pub fn generate(class: &Class) -> TokenStream {
         /// it must stay there.
         #vis fn allocate(#(#parameters),*) -> ::com::production::ClassAllocation<Self> {
             #interface_inits
-            #interface_data
             let instance = #name {
                 #interface_fields
                 #ref_count_ident: ::core::cell::Cell::new(1),

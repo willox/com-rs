@@ -1,4 +1,5 @@
 use crate::interfaces::IUnknown;
+use crate::interfaces::idispatch::{MethodData, InterfaceData};
 use crate::sys::IID;
 
 /// A COM compliant interface pointer
@@ -21,6 +22,30 @@ pub unsafe trait Interface: Sized + 'static {
     type Super: Interface;
     /// The associated id for this interface
     const IID: IID;
+
+    /// Retrieve a set of COM [METHODDATA](https://docs.microsoft.com/en-us/windows/win32/api/oleauto/ns-oleauto-methoddata) structures describing this interface
+    /// This only returns the method_data array for this interface (excluding parents.)
+    fn static_method_data() -> &'static [MethodData];
+
+    fn build_method_data(vec: &mut Vec<MethodData>) {
+        if Self::IID != <IUnknown as Interface>::IID {
+            Self::Super::build_method_data(vec);
+        }
+
+        vec.extend(Self::static_method_data());
+    }
+
+    fn method_data() -> Vec<MethodData> {
+        let mut methods = vec![];
+        Self::build_method_data(&mut methods);
+
+        // Fix up the method IDs
+        for (idx, method) in methods.iter_mut().enumerate() {
+            method.method_id = idx as u32;
+        }
+
+        methods
+    }
 
     /// Check whether a given IID is in the inheritance hierarchy of this interface
     fn is_iid_in_inheritance_chain(riid: &IID) -> bool {

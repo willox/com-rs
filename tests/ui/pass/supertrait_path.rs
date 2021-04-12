@@ -37,4 +37,18 @@ mod specific_use {
     }
 }
 
+mod dispatch {
+    com::interfaces! {
+        #[uuid("12345678-1234-1234-1234-12345678ABCF")]
+        unsafe interface ITest: $IDispatch {}
+    }
+
+    #[cfg(feature = "production")]
+    com::class! {
+        class Test : ITest($IDispatch) {}
+
+        impl ITest for Test {}
+    }
+}
+
 fn main() {}

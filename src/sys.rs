@@ -96,6 +96,9 @@ extern "system" {
     pub fn SysAllocStringLen(data: *const c_void, len: u32) -> *mut c_void;
     pub fn SysFreeString(bstr: *mut c_void);
     pub fn SysStringLen(bstr: *mut c_void) -> u32;
+
+    pub fn CreateDispTypeInfo(interface_data: *const c_void, lcid: u32, type_info: *mut *mut c_void) -> HRESULT;
+    pub fn CreateStdDispatch(unknown: *mut c_void, this: *mut c_void, type_info: *mut c_void, new_unkown: *mut *mut c_void) -> HRESULT;
 }
 
 #[cfg(windows)]

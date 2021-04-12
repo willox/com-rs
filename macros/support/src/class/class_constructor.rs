@@ -7,6 +7,45 @@ pub fn generate(class: &Class) -> TokenStream {
     let name = &class.name;
     let vis = &class.visibility;
 
+    let std_dispatch_default = if class.requires_dispatch {
+        Some(quote! {
+            __std_dispatch: None,
+        })
+    } else {
+        None
+    };
+
+    let std_dispatch_init = if class.requires_dispatch {
+        let chain = class.interfaces.iter().find(|x| x.needs_dispatch_imp).unwrap();
+        let interface = chain.path.clone();
+
+        Some(quote! {
+            unsafe {
+                let mut type_info: Option<::com::interfaces::ITypeInfo> = None;
+                let res = ::com::sys::CreateDispTypeInfo(
+                    interface_data_ptr as *const _,
+                    0,
+                    &mut type_info as *mut _ as _,
+                );
+                assert_eq!(res, ::com::sys::S_OK,);
+                let mut type_info = type_info.unwrap();
+
+                let mut our_unkown = instance.query_interface::<::com::interfaces::IUnknown>().unwrap();
+                let mut our_dispatch = instance.query_interface::<#interface>().unwrap();
+
+                let res  = ::com::sys::CreateStdDispatch(
+                    std::mem::transmute(our_unkown),
+                    std::mem::transmute(our_dispatch),
+                    std::mem::transmute(type_info),
+                    &mut instance.__std_dispatch as *mut _ as _,
+                );
+                assert_eq!(res, ::com::sys::S_OK);
+            }
+        })
+    } else {
+        None
+    };
+
     let parameters = &class.fields;
     let user_fields = class.fields.iter().map(|f| {
         let name = &f.ident;
@@ -16,6 +55,14 @@ pub fn generate(class: &Class) -> TokenStream {
     });
 
     let interface_inits = gen_vpointer_inits(class);
+
+    let interface_data = if class.requires_dispatch {
+        let chain = class.interfaces.iter().find(|x| x.needs_dispatch_imp).unwrap();
+        Some(chain.to_interface_data_ptr_tokens())
+    } else {
+        None
+    };
+
     let ref_count_ident = crate::utils::ref_count_ident();
 
     let interfaces = &class.interfaces;
@@ -29,12 +76,15 @@ pub fn generate(class: &Class) -> TokenStream {
         /// it must stay there.
         #vis fn allocate(#(#parameters),*) -> ::com::production::ClassAllocation<Self> {
             #interface_inits
+            #interface_data
             let instance = #name {
                 #interface_fields
                 #ref_count_ident: ::core::cell::Cell::new(1),
+                #std_dispatch_default
                 #(#user_fields),*
             };
-            let instance = ::com::alloc::boxed::Box::pin(instance);
+            let mut instance = ::com::alloc::boxed::Box::pin(instance);
+            #std_dispatch_init
             ::com::production::ClassAllocation::new(instance)
         }
     }

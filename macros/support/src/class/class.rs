@@ -13,6 +13,7 @@ pub struct Class {
     pub docs: Vec<syn::Attribute>,
     pub visibility: syn::Visibility,
     pub interfaces: Vec<Interface>,
+    pub requires_dispatch: bool,
     pub methods: HashMap<syn::Path, Vec<syn::ImplItemMethod>>,
     pub fields: Vec<syn::Field>,
     pub impl_debug: bool,
@@ -50,6 +51,7 @@ impl Class {
         has_class_factory: bool,
     ) -> syn::Result<Self> {
         let mut interfaces: Vec<Interface> = Vec::new();
+        let mut encountered_dispatch = false;
         let visibility = input.parse::<syn::Visibility>()?;
 
         let _ = input.parse::<keywords::class>()?;
@@ -61,6 +63,7 @@ impl Class {
             let interface = Interface {
                 path: path.clone(),
                 parent: None,
+                needs_dispatch_imp: false,
             };
             if interfaces.iter().any(|i| i.path == path) {
                 return Err(syn::Error::new(path.span(), "interface was redefined"));
@@ -68,22 +71,60 @@ impl Class {
             interfaces.push(interface);
 
             let mut current = interfaces.last_mut().unwrap();
-            fn parse_parens(buffer: &ParseBuffer, current: &mut Interface) -> syn::Result<()> {
+            fn parse_parens(buffer: &ParseBuffer, current: &mut Interface) -> syn::Result<bool> {
+                let mut is_dispatched = false;
+
                 while buffer.peek(syn::token::Paren) {
                     let contents;
                     syn::parenthesized!(contents in buffer);
-                    let path = contents.parse::<syn::Path>()?;
-                    let parent = Interface { path, parent: None };
+
+                    // Special names
+                    let path = if contents.peek(syn::Token![$]) {
+                        contents.parse::<syn::Token![$]>()?;
+
+                        match contents.parse::<Ident>()? {
+                            ident if ident == "IDispatch" => {
+                                is_dispatched = true;
+                                syn::parse_quote!(::com::interfaces::IDispatch)
+                            }
+        
+                            other => {
+                                return Err(syn::Error::new(
+                                    other.span(),
+                                    format!("Unknown built-in interface `{}`", other),
+                                ));
+                            }
+                        }
+                    } else {
+                        contents.parse::<syn::Path>()?
+                    };
+
+                    let parent = Interface {
+                        path,
+                        parent: None,
+                        needs_dispatch_imp: false,
+                    };
                     current.parent = Some(Box::new(parent));
                     if !contents.is_empty() {
-                        parse_parens(&contents, current.parent.as_mut().unwrap().as_mut())?;
+                        is_dispatched = parse_parens(&contents, current.parent.as_mut().unwrap().as_mut())? || is_dispatched;
                     }
                 }
 
-                Ok(())
+                Ok(is_dispatched)
             }
 
-            parse_parens(&input, &mut current)?;
+            if parse_parens(&input, &mut current)? {
+                if encountered_dispatch {
+                    // Something already inherited IDispatch - this isn't allowed
+                    return Err(syn::Error::new(
+                        path.span(),
+                        "IDispatch found in multiple interface inheritance chains",
+                    ));
+                } 
+
+                encountered_dispatch = true;
+                current.needs_dispatch_imp = true;
+            }
 
             if !input.peek(syn::token::Brace) {
                 let _ = input.parse::<syn::Token!(,)>()?;
@@ -104,6 +145,7 @@ impl Class {
             docs,
             visibility,
             interfaces,
+            requires_dispatch: encountered_dispatch,
             methods: HashMap::new(),
             fields,
             impl_debug: false,
@@ -134,6 +176,14 @@ impl Class {
         });
         let ref_count_ident = crate::utils::ref_count_ident();
 
+        let std_dispatch = if self.requires_dispatch {
+            Some(quote! {
+                __std_dispatch: Option<com::interfaces::IUnknown>,
+            })
+        } else {
+            None
+        };
+
         let user_fields = &self.fields;
         let docs = &self.docs;
         let methods = self.methods.values().flatten().map(|m| {
@@ -145,7 +195,7 @@ impl Class {
 
         let iunknown = super::iunknown_impl::IUnknown::new();
         let add_ref = iunknown.to_add_ref_tokens();
-        let query_interface = iunknown.to_query_interface_tokens(interfaces);
+        let query_interface = iunknown.to_query_interface_tokens(interfaces, self.requires_dispatch);
         let constructor = super::class_constructor::generate(self);
         let interface_drops = interfaces.iter().enumerate().map(|(index, _)| {
             let field_ident = quote::format_ident!("__{}", index);
@@ -162,6 +212,7 @@ impl Class {
             #vis struct #name {
                 #(#interface_fields,)*
                 #ref_count_ident: ::core::cell::Cell<u32>,
+                #std_dispatch
                 #(#user_fields),*
             }
             impl #name {
@@ -300,12 +351,53 @@ impl syn::parse::Parse for Class {
         }
         let mut class = match class {
             Some(c) => {
+                if c.requires_dispatch {
+                    // This VTable ends up unimplemented because we expect all dispatches to go through our
+                    // external IDispatch implementation.
+                    let idispatch_path: syn::Path = syn::parse_quote! {::com::interfaces::IDispatch};
+
+                    if let Some((orig, _)) = methods.get_key_value(&idispatch_path) {
+                        return Err(syn::Error::new(orig.span(), "$IDispatch should not be manually implemented"));
+                    }
+
+                    let get_type_info_count: syn::ImplItemMethod = syn::parse_quote! {
+                        fn GetTypeInfoCount(&self) {
+                            unimplemented!()
+                        }
+                    };
+
+                    let get_type_info: syn::ImplItemMethod = syn::parse_quote! {
+                        fn GetTypeInfo(&self) {
+                            unimplemented!()
+                        }
+                    };
+
+                    let get_ids_of_names: syn::ImplItemMethod = syn::parse_quote! {
+                        fn GetIDsOfNames(&self) {
+                            unimplemented!()
+                        }
+                    };
+
+                    let invoke: syn::ImplItemMethod = syn::parse_quote! {
+                        fn Invoke(&self) {
+                            unimplemented!()
+                        }
+                    };
+
+                    methods.insert(idispatch_path, vec![
+                        get_type_info_count,
+                        get_type_info,
+                        get_ids_of_names,                        
+                        invoke
+                    ]);
+                }
+
                 let mut interface_paths = c.interfaces_paths();
                 for i in methods.keys() {
                     if !interface_paths.remove(i) {
                         return Err(syn::Error::new(
                             i.span(),
-                            "impl for a non-declared interface",
+                            format!("impl for a non-declared interface: {:#?}", interface_paths),
                         ));
                     }
                 }
@@ -348,9 +440,46 @@ mod keywords {
 pub struct Interface {
     pub path: syn::Path,
     pub parent: Option<Box<Interface>>,
+
+    // This is only ever set on the top-level Interface
+    pub needs_dispatch_imp: bool,
 }
 
 impl Interface {
+    /// Creates a METHODDATA array for the class's interface chain which contains IDispatch
+    pub fn to_interface_data_ptr_tokens(&self) -> TokenStream {        
+        quote! {
+            let interface_data_ptr: *const ::com::interfaces::idispatch::InterfaceData = unsafe {
+                static params: [::com::interfaces::idispatch::ParamData; 1] = [
+                    ::com::interfaces::idispatch::ParamData {
+                        name: std::ptr::null(),
+                        var_type: ::com::TypeDescVarType::Bool,
+                    }
+                ];
+
+                static dispatch_methods: [::com::interfaces::idispatch::MethodData; 1] = [
+                    ::com::interfaces::idispatch::MethodData {
+                        name: std::ptr::null(),
+                        params: &params as *const _,
+                        dispatch_id: ::com::interfaces::idispatch::DispatchId(402),
+                        method_id: 41,
+                        calling_convention: ::com::interfaces::idispatch::CallingConvention::StdCall,
+                        params_count: 1,
+                        flags: 4,
+                        return_type: ::com::TypeDescVarType::Empty,
+                    }
+                ];
+
+                static interface: ::com::interfaces::idispatch::InterfaceData = ::com::interfaces::idispatch::InterfaceData {
+                    methods: &dispatch_methods as *const _,
+                    method_count: 1,
+                };
+
+                &interface as *const _
+            };
+        }
+    }
+
     /// Creates an intialized VTable for the interface
     pub fn to_initialized_vtable_tokens(&self, class: &Class, offset: usize) -> TokenStream {
         let class_name = &class.name;

@@ -46,7 +46,6 @@
 
 #![allow(clippy::transmute_ptr_to_ptr)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
-#![deny(missing_docs)]
 
 mod abi_transferable;
 mod bstring;
@@ -56,10 +55,13 @@ mod param;
 #[cfg(windows)]
 pub mod runtime;
 pub mod sys;
+mod vartype;
 
 #[cfg(feature = "production")]
 /// Functionality for producing COM classes
 pub mod production;
+
+use std::ffi::c_void;
 
 #[doc(inline)]
 pub use abi_transferable::AbiTransferable;
@@ -71,6 +73,40 @@ pub use interface::Interface;
 pub use param::Param;
 #[doc(inline)]
 pub use sys::{CLSID, IID};
+#[doc(inline)]
+pub use vartype::TypeDescVarType;
+
+com::interfaces! {
+    #[uuid("12345678-1234-1234-1234-12345678ABCF")]
+    unsafe interface ITest: $IDispatch {
+        fn fuck(&self);
+    }
+}
+
+extern crate self as com;
+
+#[cfg(feature = "production")]
+com::class! {
+    class Test : ITest($IDispatch) {
+        val: u32,
+    }
+
+    impl ITest for Test {
+        fn fuck(&self) {
+            todo!()
+        }
+    }
+
+}
+
+#[test]
+fn dispatch() {
+    com::runtime::init_runtime();
+    let inst = Test::allocate(23);
+
+    println!("{:?}", inst.val);
+    return;
+}
 
 /// Declare COM interfaces
 ///
@@ -118,8 +154,8 @@ pub use com_macros::class;
 
 // this allows for the crate to refer to itself as `com` to keep macros consistent
 // whether they are used by some other crate or internally
-#[doc(hidden)]
-extern crate self as com;
+//#[doc(hidden)]
+//extern crate self as com;
 
 // We re-export `alloc` so that we can use `com::alloc::boxed::Box` in generated code,
 // for code that uses `#![no_std]`.

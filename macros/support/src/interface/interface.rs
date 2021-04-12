@@ -140,7 +140,7 @@ impl syn::parse::Parse for Interface {
                 ))
             }
         };
-        let name = input.parse::<Ident>()?;
+        let name = input.parse::<syn::Ident>()?;
         let mut parent = None;
         if name != "IUnknown" {
             let _ = input.parse::<syn::Token![:]>().map_err(|_| {
@@ -149,7 +149,25 @@ impl syn::parse::Parse for Interface {
                     format!("Interfaces must inherit from another interface like so: `interface {}: IParentInterface`", name),
                 )
             })?;
-            parent = Some(input.parse::<Path>()?);
+
+            // Special names
+            if input.peek(syn::Token![$]) {
+                input.parse::<syn::Token![$]>()?;
+                match input.parse::<Ident>()? {
+                    ident if ident == "IDispatch" => {
+                        parent = Some(syn::parse_quote!(::com::interfaces::IDispatch));
+                    }
+
+                    other => {
+                        return Err(syn::Error::new(
+                            other.span(),
+                            format!("Unknown built-in interface `{}`", other),
+                        ));
+                    }
+                }
+            } else {
+                parent = Some(input.parse::<Path>()?);
+            }
         }
         let content;
         syn::braced!(content in input);

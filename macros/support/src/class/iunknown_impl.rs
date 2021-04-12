@@ -93,9 +93,22 @@ impl IUnknown {
         }
     }
 
-    pub fn to_query_interface_tokens(&self, interfaces: &[Interface]) -> TokenStream {
+    pub fn to_query_interface_tokens(&self, interfaces: &[Interface], generating_dispatch: bool) -> TokenStream {
         // Generate match arms for implemented interfaces
         let base_match_arms = Self::gen_base_match_arms(interfaces);
+
+        let dispatch_arms = if generating_dispatch {
+            Some(quote! {
+                else if riid == &::com::interfaces::idispatch::IID_IDISPATCH {
+                    let ret = self.__std_dispatch.as_ref().unwrap().QueryInterface(riid, ppv);
+                    if ret != ::com::sys::NOERROR {
+                        return ret;
+                    }
+                }
+            })
+        } else {
+            None
+        };
 
         quote! {
             pub unsafe fn QueryInterface(
@@ -109,7 +122,7 @@ impl IUnknown {
                     // Cast the &Pin<Box<T>> as a pointer and then dereference
                     // it to get the Pin<Box> as a pointer
                     *ppv = *(self as *const _ as *const *mut ::core::ffi::c_void);
-                } #base_match_arms else {
+                } #dispatch_arms #base_match_arms else {
                     *ppv = ::core::ptr::null_mut::<::core::ffi::c_void>();
                     return ::com::sys::E_NOINTERFACE;
                 }

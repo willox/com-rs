@@ -222,6 +222,7 @@ impl syn::parse::Parse for ParenthsizedInt {
     }
 }
 
+#[derive(Clone)]
 pub struct InterfaceMethod {
     pub name: Ident,
     pub visibility: Visibility,
@@ -232,12 +233,14 @@ pub struct InterfaceMethod {
     pub kind: InterfaceMethodKind,
 }
 
+#[derive(Clone)]
 pub enum InterfaceMethodKind {
     Method,
     PropertyGet,
     PropertySet,
 }
 
+#[derive(Clone)]
 pub struct InterfaceMethodArg {
     pub ty: Box<syn::Type>,
     pub pat: Box<syn::Pat>,

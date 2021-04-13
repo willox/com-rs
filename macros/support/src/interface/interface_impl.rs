@@ -29,10 +29,22 @@ fn method_data(interface: &Interface) -> TokenStream {
             current_dispatch_id += 1;
         }
 
-        let param_offset = param_buffer.len();
-        let param_count = method.args.len() as u32;
+        let mut params = method.args.clone();
 
-        for param in &method.args {
+        let mut ret_type = match &method.ret {
+            syn::ReturnType::Default => quote!(::com::TypeDescVarType::Empty),
+            syn::ReturnType::Type(_, ty) => quote!(<#ty as ::com::AbiTransferable>::VAR_TYPE),
+        };
+
+        if let InterfaceMethodKind::PropertyGet = method.kind {
+            params.pop();
+            ret_type = quote!(::com::TypeDescVarType::Dispatch);
+        }
+
+        let param_offset = param_buffer.len();
+        let param_count = params.len() as u32;
+
+        for param in &params {
             let ty = param.ty.clone();
 
             param_buffer.push(quote! {
@@ -45,8 +57,8 @@ fn method_data(interface: &Interface) -> TokenStream {
 
         let flags: u16 = match method.kind {
             InterfaceMethodKind::Method => 1,
-            InterfaceMethodKind::PropertyGet => 2,
-            InterfaceMethodKind::PropertySet => 4,
+            InterfaceMethodKind::PropertyGet => 3,
+            InterfaceMethodKind::PropertySet => 5,
         };
 
         let params = if param_count > 0 {
@@ -55,19 +67,25 @@ fn method_data(interface: &Interface) -> TokenStream {
             quote!(std::ptr::null())
         };
 
-        let ret_type = match &method.ret {
-            syn::ReturnType::Default => quote!(::com::TypeDescVarType::Empty),
-            syn::ReturnType::Type(_, ty) => quote!(<#ty as ::com::AbiTransferable>::VAR_TYPE),
-        };
-
         let dispatch_id = match method.dispatch_id {
             Some(id) => id,
             _ => current_dispatch_id,
         };
 
+        let mut name_utf16: Vec<u16> = method.name.to_string().encode_utf16().collect();
+        name_utf16.push(0);
+        let name_bytes = unsafe {
+            std::slice::from_raw_parts(
+                name_utf16.as_ptr() as *const u8,
+                name_utf16.len() * 2
+            )
+        };
+
+        let name_lit = syn::LitByteStr::new(name_bytes, method.name.span());
+
         method_buffer.push(quote! {
             ::com::interfaces::idispatch::MethodData {
-                name: std::ptr::null(),
+                name: #name_lit as *const _ as _,
                 params: #params,
                 dispatch_id: ::com::interfaces::idispatch::DispatchId(#dispatch_id),
                 method_id: 0, // Populated later

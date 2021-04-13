@@ -63,10 +63,10 @@ impl From<&str> for BString {
     }
 }
 
-impl TryFrom<BString> for String {
+impl TryFrom<&BString> for String {
     type Error = std::string::FromUtf16Error;
 
-    fn try_from(bstr: BString) -> Result<Self, Self::Error> {
+    fn try_from(bstr: &BString) -> Result<Self, Self::Error> {
         Self::from_utf16(bstr.as_ref())
     }
 }

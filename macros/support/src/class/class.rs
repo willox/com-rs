@@ -373,13 +373,23 @@ impl syn::parse::Parse for Class {
                     };
 
                     let get_ids_of_names: syn::ImplItemMethod = syn::parse_quote! {
-                        fn GetIDsOfNames(&self) {
+                        fn GetIDsOfNames(&self, id: *const com::sys::IID, names: *const *const u16, count: u32, lcid: u32, out: *mut u32) {
                             unimplemented!()
                         }
                     };
 
                     let invoke: syn::ImplItemMethod = syn::parse_quote! {
-                        fn Invoke(&self) {
+                        fn Invoke(
+                            &self,
+                            disp_id: u32,
+                            riid: *const ::com::sys::IID,
+                            lcid: u32,
+                            flags: u16,
+                            params: *const u32,
+                            result: *mut u32,
+                            excep_info: *mut u32,
+                            arg_err: *mut u32
+                        ) {
                             unimplemented!()
                         }
                     };

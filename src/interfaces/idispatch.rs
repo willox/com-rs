@@ -82,7 +82,7 @@ interfaces! {
         pub fn GetTypeInfo(&self);
 
         /// COM stuff
-        pub fn GetIDsOfNames(&self, id: *const com::sys::IID, names: *const *const u16, count: u32, lcid: u32, out: *mut u32);
+        pub fn GetIDsOfNames(&self, id: *const com::sys::IID, names: *const *const u16, count: u32, lcid: u32, out: *mut u32) -> HRESULT;
 
         /// COM stuff
         pub fn Invoke(
@@ -95,6 +95,6 @@ interfaces! {
             result: *mut u32,
             excep_info: *mut u32,
             arg_err: *mut u32
-        );
+        ) -> HRESULT;
     }
 }

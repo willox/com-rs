@@ -123,6 +123,7 @@ impl IUnknown {
                     // it to get the Pin<Box> as a pointer
                     *ppv = *(self as *const _ as *const *mut ::core::ffi::c_void);
                 } #dispatch_arms #base_match_arms else {
+                    println!("Couldn't find interface {:?}", *riid);
                     *ppv = ::core::ptr::null_mut::<::core::ffi::c_void>();
                     return ::com::sys::E_NOINTERFACE;
                 }

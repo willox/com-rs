@@ -373,7 +373,7 @@ impl syn::parse::Parse for Class {
                     };
 
                     let get_ids_of_names: syn::ImplItemMethod = syn::parse_quote! {
-                        fn GetIDsOfNames(&self, id: *const com::sys::IID, names: *const *const u16, count: u32, lcid: u32, out: *mut u32) {
+                        fn GetIDsOfNames(&self, id: *const com::sys::IID, names: *const *const u16, count: u32, lcid: u32, out: *mut u32) -> ::com::sys::HRESULT {
                             unimplemented!()
                         }
                     };
@@ -389,7 +389,7 @@ impl syn::parse::Parse for Class {
                             result: *mut u32,
                             excep_info: *mut u32,
                             arg_err: *mut u32
-                        ) {
+                        ) -> ::com::sys::HRESULT {
                             unimplemented!()
                         }
                     };

@@ -60,6 +60,7 @@ mod vartype;
 #[cfg(feature = "production")]
 /// Functionality for producing COM classes
 pub mod production;
+mod safearray;
 
 use std::ffi::c_void;
 
@@ -71,6 +72,8 @@ pub use bstring::BString;
 pub use interface::Interface;
 #[doc(inline)]
 pub use param::Param;
+#[doc(inline)]
+pub use safearray::SafeArray;
 #[doc(inline)]
 pub use sys::{CLSID, IID};
 #[doc(inline)]

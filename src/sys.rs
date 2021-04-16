@@ -97,6 +97,9 @@ extern "system" {
     pub fn SysFreeString(bstr: *mut c_void);
     pub fn SysStringLen(bstr: *mut c_void) -> u32;
 
+    pub fn SafeArrayCreate(var_type: u16, dimensions: u32, bounds: *const c_void) -> *mut c_void;
+    pub fn SafeArrayDestroy(array: *mut c_void);
+
     pub fn CreateDispTypeInfo(interface_data: *const c_void, lcid: u32, type_info: *mut *mut c_void) -> HRESULT;
     pub fn CreateStdDispatch(unknown: *mut c_void, this: *mut c_void, type_info: *mut c_void, new_unkown: *mut *mut c_void) -> HRESULT;
 }

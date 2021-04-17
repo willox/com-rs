@@ -62,8 +62,6 @@ mod vartype;
 pub mod production;
 mod safearray;
 
-use std::ffi::c_void;
-
 #[doc(inline)]
 pub use abi_transferable::AbiTransferable;
 #[doc(inline)]

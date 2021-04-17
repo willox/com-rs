@@ -1,5 +1,5 @@
 use crate::interfaces::IUnknown;
-use crate::interfaces::idispatch::{MethodData, InterfaceData};
+use crate::interfaces::idispatch::{MethodData};
 use crate::sys::IID;
 
 /// A COM compliant interface pointer
